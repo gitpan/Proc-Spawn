@@ -12,7 +12,7 @@ my $i = 2;
 # Test values
 my $Cmd    = "/bin/cat";
 my $ErrCmd = "/bin/cat 1>&2";
-my $Data   = "testing testing testing\n";
+my $Data   = "testing testing testing\r\n";
 
 # Pipes
 eval {
@@ -41,7 +41,7 @@ eval {
   my $out = <$pty_fh>;
   die "Invalid output" unless ( $out and $out eq $Data );
 };
-print ($@ ? "not ok $i" : "ok $i\n"); $i++;
+print ($@ ? "not ok $i and $@ ($$)" : "ok $i\n"); $i++;
 
 eval {
   my ($pid, $pty_fh) = spawn_pty($Cmd);
@@ -50,4 +50,4 @@ eval {
   my $err = <$pty_fh>;
   die "Invalid output" unless ( $err and $err eq $Data );
 };
-print ($@ ? "not ok $i" : "ok $i\n"); $i++;
+print ($@ ? "not ok $i ($$)" : "ok $i\n"); $i++;

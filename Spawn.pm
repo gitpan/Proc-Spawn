@@ -7,7 +7,7 @@ use IO;
 use IO::Pty;
 
 ## Module Version
-our $VERSION = 1.02;
+our $VERSION = 1.03;
 
 require Exporter;
 our @ISA    = qw(Exporter);
@@ -30,45 +30,40 @@ sub spawn_pty ($) {
 
   # Get a pty to use for stdio
   my $pty = new IO::Pty;
-  die "Cannot find a new pty\n" unless defined $pty;
-  my $slave = $pty->slave;
+  die "Cannot find a pty\n" unless defined $pty;
+  $pty->autoflush(1);
 
   # Create a child to exec the command
   my $pid = fork;
   die "Cannot fork: $!\n" unless defined $pid;
 
   unless ( $pid ) { # Child
-    # Close shared stdio
-    close STDIN;
-    close STDOUT;
-    close STDERR;
+    &POSIX::setsid() or die "Failed to setsid: $!\n";
+    my $tty = $pty->slave;
+    close $pty;
 
-    # Open stdio on pseudo-tty
-    my $ptyFN = fileno($pty);
-    open(STDIN,  "<&$ptyFN");
-    open(STDOUT, ">&$ptyFN");
-    open(STDERR, ">&$ptyFN");
+    # Close/Reopen stdio
+    my $tty_no = fileno($tty);
+    close STDIN;  open(STDIN,  "<&$tty_no");
+    close STDOUT; open(STDOUT, ">&$tty_no");
+    close STDERR; open(STDERR, ">&$tty_no");
+    close $tty;
 
     # Sanity check
-    die "Stdio not opened properly\n" unless fileno(STDERR) == 2;
-
-    # Close unneeded filehandles
-    close($pty);
-    close($slave);
+    exit 1 unless fileno(STDERR) == 2;
 
     # Run the command
     if ( ref($cmd) =~ /ARRAY/ ) {
       exec @$cmd;
-      die "Cannot exec @$cmd: $!\n";
+      exit 1;
     } else {
       exec $cmd;
-      die "Cannot exec $cmd: $!\n";
+      exit 1;
     }
   }
 
   # Parent
-  close($pty);
-  return ($pid, $slave);
+  return ($pid, $pty);
 }
 
 
